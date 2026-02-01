@@ -131,23 +131,45 @@ kpd-platform/
 
 ## Деплой на продакшн сервер
 
-1. Скопируйте проект на сервер
-
-2. Создайте `.env` файл с продакшн значениями:
+1. Клонируйте проект на сервер:
 ```bash
-DB_USER=kpd_user
-DB_PASSWORD=<сильный-пароль>
-DB_NAME=kpd_platform
-JWT_SECRET=<случайный-секретный-ключ>
-VITE_API_URL=https://api.yourdomain.com/api
+git clone https://github.com/azamat02/kpd-platform.git
+cd kpd-platform
 ```
 
-3. Запустите:
+2. **ВАЖНО:** Создайте `.env` файл с вашим IP/доменом:
+```bash
+# Замените 123.45.67.89 на IP вашего сервера
+cat > .env << 'EOF'
+DB_USER=kpd_user
+DB_PASSWORD=your_secure_password_here
+DB_NAME=kpd_platform
+JWT_SECRET=your-random-secret-key-32-chars
+VITE_API_URL=http://123.45.67.89:3001/api
+EOF
+```
+
+Пример для сервера с IP `134.209.226.207`:
+```bash
+VITE_API_URL=http://134.209.226.207:3001/api
+```
+
+3. Запустите (первый раз с `--build`):
 ```bash
 docker-compose up -d --build
 ```
 
-4. Для HTTPS настройте reverse proxy (nginx/traefik).
+4. Откройте в браузере:
+- **Frontend**: http://ВАШ_IP
+- **Backend API**: http://ВАШ_IP:3001/api
+
+5. Для HTTPS настройте reverse proxy (nginx/traefik).
+
+**Если изменили VITE_API_URL** — нужно пересобрать frontend:
+```bash
+docker-compose down
+docker-compose up -d --build
+```
 
 ---
 
