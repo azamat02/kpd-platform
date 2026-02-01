@@ -390,7 +390,7 @@ export const deleteBlock = async (req: AuthRequest, res: Response) => {
 export const addTask = async (req: AuthRequest, res: Response) => {
   try {
     const { id, blockId } = req.params;
-    const { name, weight, unit, planValue } = req.body;
+    const { name, weight, unit, planValue, isOptional } = req.body;
 
     if (!name || weight === undefined) {
       return res.status(400).json({ error: 'Name and weight are required' });
@@ -425,8 +425,9 @@ export const addTask = async (req: AuthRequest, res: Response) => {
         blockId: parseInt(blockId),
         name,
         weight: parseFloat(weight),
-        unit: unit || 'шт',
+        unit: unit || '%',
         planValue: planValue !== undefined ? parseFloat(planValue) : 100,
+        isOptional: isOptional || false,
         order: maxOrder + 1,
       },
     });
@@ -442,7 +443,7 @@ export const addTask = async (req: AuthRequest, res: Response) => {
 export const updateTask = async (req: AuthRequest, res: Response) => {
   try {
     const { id, blockId, taskId } = req.params;
-    const { name, weight, order, unit, planValue } = req.body;
+    const { name, weight, order, unit, planValue, isOptional } = req.body;
 
     const kpi = await prisma.kpi.findUnique({
       where: { id: parseInt(id) },
@@ -471,6 +472,7 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
     if (order !== undefined) updateData.order = order;
     if (unit !== undefined) updateData.unit = unit;
     if (planValue !== undefined) updateData.planValue = parseFloat(planValue);
+    if (isOptional !== undefined) updateData.isOptional = isOptional;
 
     const updatedTask = await prisma.kpiTask.update({
       where: { id: parseInt(taskId) },
@@ -660,10 +662,11 @@ export const submitForApproval = async (req: AuthRequest, res: Response) => {
         errors.push(`Block "${block.name}" must have at least one task`);
       }
 
-      // Сумма весов задач в блоке = 100%
-      const taskWeight = block.tasks.reduce((sum, task) => sum + task.weight, 0);
-      if (Math.abs(taskWeight - 100) > 0.01) {
-        errors.push(`Tasks in block "${block.name}" must have total weight of 100%, current: ${taskWeight}%`);
+      // Сумма весов НЕопциональных задач в блоке = 100%
+      const requiredTasks = block.tasks.filter((task) => !task.isOptional);
+      const taskWeight = requiredTasks.reduce((sum, task) => sum + task.weight, 0);
+      if (requiredTasks.length > 0 && Math.abs(taskWeight - 100) > 0.01) {
+        errors.push(`Required tasks in block "${block.name}" must have total weight of 100%, current: ${taskWeight}%`);
       }
     }
 
@@ -1122,14 +1125,16 @@ export const submitResults = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Results already submitted' });
     }
 
-    // Получить все ID задач
-    const taskIds = assignment.kpi.blocks.flatMap((block) => block.tasks.map((t) => t.id));
+    // Получить все ID обязательных задач (не опциональных)
+    const requiredTaskIds = assignment.kpi.blocks.flatMap((block) =>
+      block.tasks.filter((t) => !t.isOptional).map((t) => t.id)
+    );
     const filledTaskIds = assignment.factValues.filter((f) => f.factValue !== null).map((f) => f.taskId);
 
-    const missingTasks = taskIds.filter((id) => !filledTaskIds.includes(id));
+    const missingTasks = requiredTaskIds.filter((id) => !filledTaskIds.includes(id));
     if (missingTasks.length > 0) {
       return res.status(400).json({
-        error: 'All tasks must have fact values',
+        error: 'All required tasks must have fact values',
         missingTasks,
       });
     }

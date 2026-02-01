@@ -162,8 +162,9 @@ model KpiTask {
 
   name        String   // Наименование показателя
   weight      Float    // Вес показателя внутри блока в % (сумма = 100%)
-  unit        String   @default("шт") // Единица измерения: "шт", "%", или кастомный текст
+  unit        String   @default("%") // Единица измерения
   planValue   Float    @default(100)  // Плановое значение
+  isOptional  Boolean  @default(false) // Опциональный показатель (не влияет на процент блока)
   order       Int      @default(0)
 
   createdAt   DateTime @default(now())

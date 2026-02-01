@@ -148,7 +148,7 @@ const KpiFillPage: React.FC = () => {
     }
   };
 
-  // Calculate block progress
+  // Calculate block progress (all tasks including optional)
   const getBlockProgress = (block: KpiBlock): number => {
     const tasks = block.tasks || [];
     if (tasks.length === 0) return 0;
@@ -164,26 +164,30 @@ const KpiFillPage: React.FC = () => {
     return Math.round((factValue / planValue) * 100);
   };
 
-  // Calculate block weighted score based on task completion
+  // Calculate block weighted score based on task completion (excludes optional tasks)
   const getBlockScore = (block: KpiBlock): number => {
     const tasks = block.tasks || [];
-    if (tasks.length === 0) return 0;
-    const totalWeight = tasks.reduce((sum, t) => sum + t.weight, 0);
+    // Only count non-optional tasks for the weighted score
+    const requiredTasks = tasks.filter((t) => !t.isOptional);
+    if (requiredTasks.length === 0) return 0;
+    const totalWeight = requiredTasks.reduce((sum, t) => sum + t.weight, 0);
     if (totalWeight === 0) return 0;
-    const weightedSum = tasks.reduce((sum, task) => {
+    const weightedSum = requiredTasks.reduce((sum, task) => {
       const completion = getTaskCompletion(task);
       return sum + (completion * task.weight / 100);
     }, 0);
     return Math.round(weightedSum / totalWeight * 100);
   };
 
-  // Calculate overall progress
+  // Calculate overall progress (required tasks only)
   const getOverallProgress = (): number => {
     if (!assignment) return 0;
-    const allTasks = (assignment.kpi.blocks || []).flatMap((b) => b.tasks || []);
-    if (allTasks.length === 0) return 0;
-    const filledCount = allTasks.filter((task) => factValues[task.id]?.factValue > 0).length;
-    return Math.round((filledCount / allTasks.length) * 100);
+    const allRequiredTasks = (assignment.kpi.blocks || []).flatMap((b) =>
+      (b.tasks || []).filter((t) => !t.isOptional)
+    );
+    if (allRequiredTasks.length === 0) return 0;
+    const filledCount = allRequiredTasks.filter((task) => factValues[task.id]?.factValue > 0).length;
+    return Math.round((filledCount / allRequiredTasks.length) * 100);
   };
 
   // Calculate overall weighted score
@@ -378,6 +382,11 @@ const KpiFillPage: React.FC = () => {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-sm font-bold text-slate-500">{taskNumber}</span>
                                 <span className="text-sm font-medium text-slate-900">{task.name}</span>
+                                {task.isOptional && (
+                                  <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-600 rounded">
+                                    Опционально
+                                  </span>
+                                )}
                                 <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
                                   Вес: {task.weight}%
                                 </span>
@@ -405,7 +414,7 @@ const KpiFillPage: React.FC = () => {
                                 <label className="text-sm text-slate-600">Факт:</label>
                                 <input
                                   type="number"
-                                  value={factValues[task.id]?.factValue ?? ''}
+                                  value={factValues[task.id]?.factValue || ''}
                                   onChange={(e) => handleSliderChange(task.id, parseFloat(e.target.value) || 0)}
                                   disabled={assignment.isSubmitted}
                                   className="input-field w-28 text-center font-medium disabled:opacity-50 disabled:cursor-not-allowed"

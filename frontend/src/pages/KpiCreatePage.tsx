@@ -45,7 +45,7 @@ const ChevronUpIcon = () => (
 );
 
 // Предопределенные единицы измерения
-const UNIT_OPTIONS = ['шт', '%', 'руб', 'ч', 'другое'];
+const UNIT_OPTIONS = ['%', 'Шт.', 'Ед.', 'Кол-во', 'Справочник', 'Семинар', 'Стратегия развития', 'Система', 'Анализ', 'другое'];
 
 // Local interfaces for form state
 interface LocalTask {
@@ -54,6 +54,7 @@ interface LocalTask {
   weight: string;
   unit: string;
   planValue: string;
+  isOptional: boolean;
 }
 
 interface LocalBlock {
@@ -129,11 +130,12 @@ const KpiCreatePage: React.FC = () => {
   }, [blocks]);
   const blockWeightValid = blocks.length === 0 || Math.abs(totalBlockWeight - 100) < 0.01;
 
-  // Check if all blocks have valid task weights
+  // Check if all blocks have valid task weights (excluding optional tasks)
   const allTaskWeightsValid = useMemo(() => {
     return blocks.every((block) => {
-      if (block.tasks.length === 0) return true;
-      const totalTaskWeight = block.tasks.reduce((sum, t) => sum + (parseFloat(t.weight) || 0), 0);
+      const requiredTasks = block.tasks.filter((t) => !t.isOptional);
+      if (requiredTasks.length === 0) return true;
+      const totalTaskWeight = requiredTasks.reduce((sum, t) => sum + (parseFloat(t.weight) || 0), 0);
       return Math.abs(totalTaskWeight - 100) < 0.01;
     });
   }, [blocks]);
@@ -163,13 +165,13 @@ const KpiCreatePage: React.FC = () => {
     setBlocks(
       blocks.map((b) =>
         b.id === blockId
-          ? { ...b, tasks: [...b.tasks, { id: Date.now().toString(), name: '', weight: '', unit: 'шт', planValue: '' }] }
+          ? { ...b, tasks: [...b.tasks, { id: Date.now().toString(), name: '', weight: '', unit: '%', planValue: '', isOptional: false }] }
           : b
       )
     );
   };
 
-  const updateTask = (blockId: string, taskId: string, field: keyof LocalTask, value: string) => {
+  const updateTask = (blockId: string, taskId: string, field: keyof LocalTask, value: string | boolean) => {
     setBlocks(
       blocks.map((b) =>
         b.id === blockId
@@ -188,7 +190,8 @@ const KpiCreatePage: React.FC = () => {
   };
 
   const getBlockTaskWeight = (block: LocalBlock) => {
-    return block.tasks.reduce((sum, t) => sum + (parseFloat(t.weight) || 0), 0);
+    // Считаем только обязательные (не опциональные) показатели
+    return block.tasks.filter((t) => !t.isOptional).reduce((sum, t) => sum + (parseFloat(t.weight) || 0), 0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -227,6 +230,7 @@ const KpiCreatePage: React.FC = () => {
                 weight: parseFloat(task.weight),
                 unit: task.unit || 'шт',
                 planValue: parseFloat(task.planValue) || 100,
+                isOptional: task.isOptional,
               });
             }
           }
@@ -526,7 +530,7 @@ const KpiCreatePage: React.FC = () => {
                                 {block.tasks.map((task, taskIndex) => {
                                   const blockIndex = blocks.findIndex((b) => b.id === block.id);
                                   const taskNumber = `${blockIndex + 1}.${taskIndex + 1}`;
-                                  const isCustomUnit = !['шт', '%', 'руб', 'ч'].includes(task.unit);
+                                  const isCustomUnit = !['%', 'Шт.', 'Ед.', 'Кол-во', 'Справочник', 'Семинар', 'Стратегия развития', 'Система', 'Анализ'].includes(task.unit);
 
                                   return (
                                     <div key={task.id} className="bg-slate-50 p-3 rounded-lg space-y-3">
@@ -603,6 +607,15 @@ const KpiCreatePage: React.FC = () => {
                                           />
                                           <span className="text-xs text-slate-500">{task.unit || 'ед.'}</span>
                                         </div>
+                                        <label className="flex items-center gap-2 ml-4 cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={task.isOptional}
+                                            onChange={(e) => updateTask(block.id, task.id, 'isOptional', e.target.checked)}
+                                            className="w-4 h-4 text-blue-600 rounded border-slate-300"
+                                          />
+                                          <span className="text-xs text-slate-500">Опционально</span>
+                                        </label>
                                       </div>
                                     </div>
                                   );
