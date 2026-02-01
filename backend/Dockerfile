@@ -1,8 +1,8 @@
 # Backend Dockerfile
 FROM node:20-alpine
 
-# Install PostgreSQL client for psql command
-RUN apk add --no-cache postgresql-client netcat-openbsd
+# Install PostgreSQL client, OpenSSL and netcat
+RUN apk add --no-cache postgresql-client netcat-openbsd openssl openssl-dev libc6-compat
 
 WORKDIR /app
 
