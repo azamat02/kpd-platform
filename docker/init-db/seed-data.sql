@@ -1,6 +1,4 @@
 -- Seed data for KPD Platform
--- This script runs after Prisma migrations
-
 -- Disable triggers for circular FK constraints
 SET session_replication_role = 'replica';
 
@@ -9,7 +7,12 @@ INSERT INTO "Admin" (id, username, "passwordHash", "createdAt") VALUES
 (1, 'admin', '$2b$10$pISqReMiLH/Uz/aVKWZHheELRkCx/ppSa9SPeyNacmD95.L29g/4K', '2026-01-30 15:20:20.091')
 ON CONFLICT (id) DO NOTHING;
 
--- Groups
+-- EvaluationPeriod
+INSERT INTO "EvaluationPeriod" (id, name, "startDate", "endDate", "isActive", "createdAt") VALUES
+(1, 'Q1', '2026-01-31 00:00:00', '2026-02-07 00:00:00', true, '2026-01-30 19:49:27.734')
+ON CONFLICT (id) DO NOTHING;
+
+-- Groups (without headId first)
 INSERT INTO "Group" (id, name, "createdAt", "headId") VALUES
 (5, 'Правление', '2026-01-30 15:43:28.565', NULL),
 (6, 'Подразделение защиты государственных секретов', '2026-01-30 16:13:07.559', NULL),
@@ -86,9 +89,31 @@ UPDATE "Group" SET "headId" = 41 WHERE id = 14;
 UPDATE "Group" SET "headId" = 43 WHERE id = 15;
 UPDATE "Group" SET "headId" = 46 WHERE id = 16;
 
--- EvaluationPeriod
-INSERT INTO "EvaluationPeriod" (id, name, "startDate", "endDate", "isActive", "createdAt") VALUES
-(1, 'Q1', '2026-01-31 00:00:00', '2026-02-07 00:00:00', true, '2026-01-30 19:49:27.734')
+-- Evaluation
+INSERT INTO "Evaluation" (id, "periodId", "evaluatorId", "evaluateeId", "formType", scores, comments, "averageScore", result, "createdAt", "updatedAt") VALUES
+(1, 1, 8, 12, 'manager', '{"quality": 5, "deadlines": 5, "discipline": 5, "leadership": 5, "noViolations": 5}', '{"quality": "", "deadlines": "", "discipline": "", "leadership": "", "noViolations": ""}', 5, 'Выполняет функциональные обязанности эффективно', '2026-01-30 19:50:39.358', '2026-01-30 19:54:32.137')
+ON CONFLICT (id) DO NOTHING;
+
+-- KPI
+INSERT INTO "Kpi" (id, title, description, deadline, status, "createdById", "approverId", "rejectionReason", "approvedAt", "submittedAt", "createdAt", "updatedAt") VALUES
+(2, 'KPI руководства АО «НЦГНТЭ» на 2025 год', 'Утверждены решением Совета директоров АО «Национальный центр государственной научно-технической экспертизы» от «01» декабря 2025 года, протокол №8', '2026-03-01 00:00:00', 'APPROVED', 1, 7, NULL, '2026-02-01 07:34:45.053', '2026-02-01 07:34:05.139', '2026-02-01 07:29:26.487', '2026-02-01 07:34:45.054')
+ON CONFLICT (id) DO NOTHING;
+
+-- KpiAssignment
+INSERT INTO "KpiAssignment" (id, "kpiId", "userId", "isSubmitted", "submittedAt", "createdAt", "updatedAt") VALUES
+(2, 2, 7, false, NULL, '2026-02-01 07:29:26.497', '2026-02-01 07:29:26.497')
+ON CONFLICT (id) DO NOTHING;
+
+-- KpiBlock
+INSERT INTO "KpiBlock" (id, "kpiId", name, weight, "order", "createdAt", "updatedAt") VALUES
+(3, 2, 'очноыфоыфоты', 40, 0, '2026-02-01 07:29:26.507', '2026-02-01 07:29:26.507'),
+(4, 2, 'ывыв', 60, 1, '2026-02-01 07:29:26.521', '2026-02-01 07:29:26.521')
+ON CONFLICT (id) DO NOTHING;
+
+-- KpiTask
+INSERT INTO "KpiTask" (id, name, weight, "order", "createdAt", "updatedAt", "blockId", "planValue", unit) VALUES
+(5, 'Подготовка информационно-аналитических справочников: «Наука Казахстана в цифрах. 2020-2024 годы»; Научно-технический потенциал регионов Республики Казахстан 2020-2024».', 100, 0, '2026-02-01 07:29:26.515', '2026-02-01 07:33:59.566', 3, 100, 'шт'),
+(6, 'ывыв', 100, 0, '2026-02-01 07:29:26.528', '2026-02-01 07:34:04.053', 4, 20, 'шт')
 ON CONFLICT (id) DO NOTHING;
 
 -- Reset sequences
