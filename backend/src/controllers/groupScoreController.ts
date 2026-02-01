@@ -315,6 +315,148 @@ export const getGroupScoreDetails = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// GET /api/group-scores/summary - Get summary statistics for scoring report
+export const getGroupScoresSummary = async (req: AuthRequest, res: Response) => {
+  try {
+    const { periodId } = req.query;
+
+    let targetPeriodId: number;
+
+    if (periodId) {
+      targetPeriodId = parseInt(periodId as string);
+    } else {
+      const activePeriod = await prisma.evaluationPeriod.findFirst({
+        where: { isActive: true },
+        orderBy: { startDate: 'desc' },
+      });
+
+      if (!activePeriod) {
+        return res.json({
+          period: null,
+          overallScore: null,
+          groupsEvaluated: 0,
+          employeesEvaluated: 0,
+          managerFormAvg: null,
+          employeeFormAvg: null,
+          groups: [],
+          distribution: { excellent: 0, good: 0, satisfactory: 0, poor: 0 },
+        });
+      }
+      targetPeriodId = activePeriod.id;
+    }
+
+    const period = await prisma.evaluationPeriod.findUnique({
+      where: { id: targetPeriodId },
+    });
+
+    if (!period) {
+      return res.status(404).json({ error: 'Period not found' });
+    }
+
+    // Get all evaluations for the period
+    const evaluations = await prisma.evaluation.findMany({
+      where: { periodId: targetPeriodId },
+      select: {
+        averageScore: true,
+        formType: true,
+        evaluateeId: true,
+      },
+    });
+
+    // Calculate averages by form type
+    const managerEvals = evaluations.filter((e) => e.formType === 'manager');
+    const employeeEvals = evaluations.filter((e) => e.formType === 'employee');
+
+    const managerFormAvg =
+      managerEvals.length > 0
+        ? Math.round((managerEvals.reduce((sum, e) => sum + e.averageScore, 0) / managerEvals.length) * 100) / 100
+        : null;
+
+    const employeeFormAvg =
+      employeeEvals.length > 0
+        ? Math.round((employeeEvals.reduce((sum, e) => sum + e.averageScore, 0) / employeeEvals.length) * 100) / 100
+        : null;
+
+    // Overall score (all evaluations)
+    const overallScore =
+      evaluations.length > 0
+        ? Math.round((evaluations.reduce((sum, e) => sum + e.averageScore, 0) / evaluations.length) * 100) / 100
+        : null;
+
+    // Unique employees evaluated
+    const employeesEvaluated = new Set(evaluations.map((e) => e.evaluateeId)).size;
+
+    // Distribution by score category
+    const distribution = {
+      excellent: evaluations.filter((e) => e.averageScore >= 4.5).length,
+      good: evaluations.filter((e) => e.averageScore >= 3.5 && e.averageScore < 4.5).length,
+      satisfactory: evaluations.filter((e) => e.averageScore >= 2.5 && e.averageScore < 3.5).length,
+      poor: evaluations.filter((e) => e.averageScore < 2.5).length,
+    };
+
+    // Get all groups with their scores
+    const groups = await prisma.group.findMany({
+      include: {
+        leader: {
+          select: {
+            id: true,
+            fullName: true,
+            position: true,
+          },
+        },
+        users: {
+          select: {
+            id: true,
+            evaluationsReceived: {
+              where: { periodId: targetPeriodId },
+              select: {
+                averageScore: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    // Calculate scores for each group
+    const groupsWithScores = groups.map((group) => {
+      const groupEvaluations = group.users.flatMap((u) => u.evaluationsReceived);
+      const groupScore =
+        groupEvaluations.length > 0
+          ? Math.round((groupEvaluations.reduce((sum, e) => sum + e.averageScore, 0) / groupEvaluations.length) * 100) /
+            100
+          : null;
+
+      return {
+        id: group.id,
+        name: group.name,
+        leader: group.leader?.fullName || null,
+        userCount: group.users.length,
+        evaluatedCount: group.users.filter((u) => u.evaluationsReceived.length > 0).length,
+        score: groupScore,
+      };
+    });
+
+    // Groups with at least one evaluation
+    const groupsEvaluated = groupsWithScores.filter((g) => g.score !== null).length;
+
+    res.json({
+      period,
+      overallScore,
+      groupsEvaluated,
+      employeesEvaluated,
+      managerFormAvg,
+      employeeFormAvg,
+      groups: groupsWithScores,
+      distribution,
+    });
+  } catch (error) {
+    console.error('Get group scores summary error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // POST /api/group-scores/calculate - Recalculate and save all group scores
 export const calculateGroupScores = async (req: AuthRequest, res: Response) => {
   try {

@@ -8,6 +8,7 @@ import UserPortalPage from './pages/UserPortalPage';
 import EvaluationPeriodsPage from './pages/EvaluationPeriodsPage';
 import EvaluationsPage from './pages/EvaluationsPage';
 import GroupScoresPage from './pages/GroupScoresPage';
+import ScoringReportPage from './pages/ScoringReportPage';
 import KpiManagementPage from './pages/KpiManagementPage';
 import KpiCreatePage from './pages/KpiCreatePage';
 import KpiFillPage from './pages/KpiFillPage';
@@ -118,6 +119,14 @@ const App: React.FC = () => {
         element={
           <AdminRoute>
             <GroupScoresPage />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/scoring-report"
+        element={
+          <AdminRoute>
+            <ScoringReportPage />
           </AdminRoute>
         }
       />

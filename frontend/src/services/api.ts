@@ -307,6 +307,33 @@ export interface CalculateGroupScoresResponse {
   }>;
 }
 
+export interface GroupSummaryItem {
+  id: number;
+  name: string;
+  leader: string | null;
+  userCount: number;
+  evaluatedCount: number;
+  score: number | null;
+}
+
+export interface ScoreDistribution {
+  excellent: number;
+  good: number;
+  satisfactory: number;
+  poor: number;
+}
+
+export interface GroupScoresSummaryResponse {
+  period: EvaluationPeriod | null;
+  overallScore: number | null;
+  groupsEvaluated: number;
+  employeesEvaluated: number;
+  managerFormAvg: number | null;
+  employeeFormAvg: number | null;
+  groups: GroupSummaryItem[];
+  distribution: ScoreDistribution;
+}
+
 export const groupScoresApi = {
   getAll: (periodId?: number) =>
     api.get<GroupScoresResponse>('/group-scores', { params: periodId ? { periodId } : {} }),
@@ -314,6 +341,8 @@ export const groupScoresApi = {
     api.get<GroupScoreDetailsResponse>(`/group-scores/${groupId}`, { params: periodId ? { periodId } : {} }),
   calculate: (periodId: number) =>
     api.post<CalculateGroupScoresResponse>('/group-scores/calculate', { periodId }),
+  getSummary: (periodId?: number) =>
+    api.get<GroupScoresSummaryResponse>('/group-scores/summary', { params: periodId ? { periodId } : {} }),
 };
 
 // ==================== KPI Types ====================
@@ -327,6 +356,7 @@ export interface KpiTask {
   weight: number;
   unit: string;        // Единица измерения: "шт", "%", или кастомный текст
   planValue: number;   // Плановое значение
+  isOptional: boolean; // Опциональный показатель (не влияет на процент блока)
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -454,6 +484,7 @@ export interface CreateKpiTaskData {
   weight: number;
   unit: string;        // Единица измерения
   planValue: number;   // Плановое значение
+  isOptional?: boolean; // Опциональный показатель
 }
 
 export interface UpdateKpiTaskData {
@@ -462,6 +493,7 @@ export interface UpdateKpiTaskData {
   order?: number;
   unit?: string;        // Единица измерения
   planValue?: number;   // Плановое значение
+  isOptional?: boolean; // Опциональный показатель
 }
 
 export interface SaveFactData {

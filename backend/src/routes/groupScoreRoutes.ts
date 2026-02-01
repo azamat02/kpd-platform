@@ -3,6 +3,7 @@ import {
   getGroupScores,
   getGroupScoreDetails,
   calculateGroupScores,
+  getGroupScoresSummary,
 } from '../controllers/groupScoreController';
 import { authMiddleware, adminOnly } from '../middleware/authMiddleware';
 
@@ -13,6 +14,9 @@ router.use(adminOnly);
 
 // GET /api/group-scores - Get group scores with hierarchy
 router.get('/', getGroupScores);
+
+// GET /api/group-scores/summary - Get summary statistics for scoring report
+router.get('/summary', getGroupScoresSummary);
 
 // POST /api/group-scores/calculate - Recalculate all group scores
 router.post('/calculate', calculateGroupScores);
