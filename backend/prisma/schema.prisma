@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Group {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  leaderId  Int?     @unique  // Один начальник на группу
+  leader    User?    @relation("GroupLeader", fields: [leaderId], references: [id])
+  users     User[]
+  scores    GroupScore[]
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  fullName     String
+  position     String
+  groupId      Int
+  group        Group    @relation(fields: [groupId], references: [id])
+  managerId    Int?
+  manager      User?    @relation("UserManager", fields: [managerId], references: [id])
+  subordinates User[]   @relation("UserManager")
+  leadsGroup   Group?   @relation("GroupLeader")  // Группа, которой руководит
+
+  // Флаги доступа и отчетности
+  submitsBasicReport Boolean  @default(false)  // Сдает базовый отчет
+  submitsKpi         Boolean  @default(false)  // Сдает KPI
+  canAccessPlatform  Boolean  @default(false)  // Может зайти в платформу
+  login              String?  @unique          // Логин для входа
+  passwordHash       String?                    // Хеш пароля для входа
+
+  // Оценки
+  evaluationsGiven    Evaluation[] @relation("EvaluationEvaluator")
+  evaluationsReceived Evaluation[] @relation("EvaluationEvaluatee")
+
+  // KPI
+  kpisToApprove  Kpi[]           @relation("KpiApprover")
+  kpiAssignments KpiAssignment[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Admin {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  createdKpis  Kpi[]    @relation("KpiCreator")
+}
+
+model EvaluationPeriod {
+  id          Int          @id @default(autoincrement())
+  name        String       // "Q1 2024", "Январь 2024"
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean      @default(true)
+  evaluations Evaluation[]
+  groupScores GroupScore[]
+  createdAt   DateTime     @default(now())
+}
+
+model Evaluation {
+  id              Int              @id @default(autoincrement())
+  periodId        Int
+  period          EvaluationPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  evaluatorId     Int              // Кто оценивает (начальник)
+  evaluator       User             @relation("EvaluationEvaluator", fields: [evaluatorId], references: [id])
+  evaluateeId     Int              // Кого оценивают
+  evaluatee       User             @relation("EvaluationEvaluatee", fields: [evaluateeId], references: [id])
+
+  formType        String           // "manager" или "employee"
+
+  // Оценки по параметрам (JSON для гибкости)
+  scores          Json             // { "param1": 4.5, "param2": 3.0, ... }
+  comments        Json?            // { "param1": "комментарий", ... }
+
+  averageScore    Float            // Средняя оценка
+  result          String           // Текстовый результат
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([periodId, evaluatorId, evaluateeId])
+}
+
+model GroupScore {
+  id          Int              @id @default(autoincrement())
+  groupId     Int
+  group       Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  periodId    Int
+  period      EvaluationPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  score       Float            // Средняя оценка группы
+  userCount   Int              // Количество оцененных сотрудников
+  isLeaf      Boolean          // Листовая группа (нет дочерних)
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([groupId, periodId])
+}
+
+// KPI System
+enum KpiStatus {
+  DRAFT              // Черновик
+  PENDING_APPROVAL   // На согласовании
+  REJECTED           // Отклонён
+  APPROVED           // Утверждён
+  COMPLETED          // Завершён
+}
+
+model Kpi {
+  id              Int         @id @default(autoincrement())
+  title           String
+  description     String?
+  deadline        DateTime
+  status          KpiStatus   @default(DRAFT)
+
+  createdById     Int
+  createdByAdmin  Admin       @relation("KpiCreator", fields: [createdById], references: [id])
+
+  approverId      Int
+  approver        User        @relation("KpiApprover", fields: [approverId], references: [id])
+
+  rejectionReason String?
+  approvedAt      DateTime?
+  submittedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  blocks          KpiBlock[]
+  assignments     KpiAssignment[]
+}
+
+model KpiBlock {
+  id          Int      @id @default(autoincrement())
+  kpiId       Int
+  kpi         Kpi      @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+
+  name        String   // Название блока
+  weight      Float    // Вес блока в % (сумма = 100%)
+  order       Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks       KpiTask[]
+}
+
+model KpiTask {
+  id          Int      @id @default(autoincrement())
+  blockId     Int
+  block       KpiBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  name        String   // Наименование показателя
+  weight      Float    // Вес показателя внутри блока в % (сумма = 100%)
+  unit        String   @default("шт") // Единица измерения: "шт", "%", или кастомный текст
+  planValue   Float    @default(100)  // Плановое значение
+  order       Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  factValues  KpiTaskFact[]
+}
+
+model KpiAssignment {
+  id          Int       @id @default(autoincrement())
+  kpiId       Int
+  kpi         Kpi       @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+
+  isSubmitted Boolean   @default(false)
+  submittedAt DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  factValues  KpiTaskFact[]
+
+  @@unique([kpiId, userId])
+}
+
+model KpiTaskFact {
+  id            Int           @id @default(autoincrement())
+  taskId        Int
+  task          KpiTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignmentId  Int
+  assignment    KpiAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  factValue     Float?
+  comment       String?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([taskId, assignmentId])
+}
