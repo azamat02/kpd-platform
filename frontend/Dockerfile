@@ -1,7 +1,10 @@
 # Frontend Dockerfile - Multi-stage build
 
 # Stage 1: Build
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
+
+# Build argument for API URL - MUST be before use
+ARG VITE_API_URL=http://localhost:3001/api
 
 WORKDIR /app
 
@@ -12,12 +15,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build argument for API URL
-ARG VITE_API_URL=http://localhost:3001/api
+# Set env and build
 ENV VITE_API_URL=$VITE_API_URL
-
-# Build the app
-RUN npm run build
+RUN echo "Building with API URL: $VITE_API_URL" && npm run build
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine
